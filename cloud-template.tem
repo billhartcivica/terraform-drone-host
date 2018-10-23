@@ -1,0 +1,50 @@
+# Template to create development machine in AWS. Uses pre-baked AMI.
+provider "aws" {
+  access_key = "${ACCESS_KEY}"
+  secret_key = "${SECRET_KEY}"
+  region     = "eu-west-2"
+}
+
+resource "aws_instance" "example" {
+  ami           = "ami-b2b55cd5"
+  instance_type = "t2.medium"
+  key_name = "MyKey"
+  root_block_device {
+    volume_type="gp2"
+    volume_size="20"
+    delete_on_termination = "true"
+    }
+  tags {
+    Name = "${MACHINE_NAME}"
+    project = "MyProject"
+    egar = "ec2"
+    Owner = "Bill"
+  }
+
+  connection {
+    type = "ssh"
+    user = "ec2-user"
+    private_key = "${file("MyKey.pem")}"
+  }
+
+  provisioner "remote-exec" {
+    inline = [
+      "sudo yum -y install docker",
+      "sudo curl -L https://github.com/docker/compose/releases/download/1.21.2/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose",
+      "sudo chmod 775 /usr/local/bin/docker-compose",
+      "sudo chkconfig docker on",
+      "sudo service docker start",
+      "sudo yum -y install git",
+      "git clone https://github.com/billhartcivica/drone-config.git"
+      ]
+  }
+}
+
+resource "aws_eip" "ip" {
+  instance = "${aws_instance.example.id}"
+}
+
+output "ip" {
+  value = "${aws_eip.ip.public_ip}"
+}
+
